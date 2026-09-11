@@ -7,62 +7,61 @@ import (
 	"os/signal"
 	"syscall"
 
-	"lazlink/command"
-
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		slog.Warn("failed to load .env", slog.Any("err", err))
-	}
-
-	token := os.Getenv("DISCORD_TOKEN")
-	if token == "" {
-		slog.Error("DISCORD_TOKEN is not set")
+	slog.Info("starting example...")
+	slog.Info("disgo version", slog.String("version", disgo.Version))
+	slog.Info("load the .env file")
+	err := godotenv.Load(".env")
+	if err != nil {
+		slog.Error("error loading .env file", slog.Any("err", err))
 		return
 	}
-
-	client, err := disgo.New(token,
+	client, err := disgo.New(os.Getenv("DISCORD_TOKEN"),
 		bot.WithGatewayConfigOpts(
 			gateway.WithIntents(
 				gateway.IntentGuildMessages,
 				gateway.IntentMessageContent,
 			),
 		),
-		bot.WithEventListenerFunc(onApplicationCommand),
+		bot.WithEventListenerFunc(onMessageCreate),
 	)
 	if err != nil {
-		slog.Error("failed to create DisGo client", slog.Any("err", err))
-		return
-	}
-	defer client.Close(context.Background())
-
-	// SetGlobalCommands replaces the global application-command set, so commands
-	// removed from command.Commands are removed automatically as well.
-	if _, err = client.Rest.SetGlobalCommands(client.ApplicationID, command.Commands); err != nil {
-		slog.Error("failed to sync application commands", slog.Any("err", err))
+		slog.Error("error while building disgo", slog.Any("err", err))
 		return
 	}
 
-	if err = client.OpenGateway(context.Background()); err != nil {
-		slog.Error("failed to open gateway", slog.Any("err", err))
+	defer client.Close(context.TODO())
+
+	if err = client.OpenGateway(context.TODO()); err != nil {
+		slog.Error("errors while connecting to gateway", slog.Any("err", err))
 		return
 	}
 
-	slog.Info("bot is now running", slog.String("disgo_version", disgo.Version))
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-	<-stop
+	slog.Info("example is now running. Press CTRL-C to exit.")
+	s := make(chan os.Signal, 1)
+	signal.Notify(s, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	<-s
 }
 
-func onApplicationCommand(event *events.ApplicationCommandInteractionCreate) {
-	if handler, ok := command.Handlers[event.SlashCommandInteractionData().CommandName()]; ok {
-		handler(event)
+func onMessageCreate(event *events.MessageCreate) {
+	if event.Message.Author.Bot {
+		return
+	}
+	var message string
+	if event.Message.Content == "ping" {
+		message = "pong"
+	} else if event.Message.Content == "pong" {
+		message = "ping"
+	}
+	if message != "" {
+		_, _ = event.Client().Rest.CreateMessage(event.ChannelID, discord.NewMessageCreate().WithContent(message))
 	}
 }
