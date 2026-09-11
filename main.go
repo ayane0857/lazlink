@@ -60,7 +60,6 @@ func main() {
 	// In this example, we care about receiving message events and their content.
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsMessageContent
 
-
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
 	if err != nil {
@@ -68,7 +67,49 @@ func main() {
 		return
 	}
 
+	// Set the bot's status
+	err = dg.UpdateStatusComplex(discordgo.UpdateStatusData{
+		Activities: []*discordgo.Activity{
+			{
+				Name: "彩音がGoを討伐中",
+				Type: discordgo.ActivityTypeGame,
+			},
+		},
+		Status: "online",
+	})
+	if err != nil {
+		log.Println("status update error:", err)
+	}
+
+
 	log.Println("Adding commands...")
+	existingCommands, err := dg.ApplicationCommands(dg.State.User.ID, "")
+	if err != nil {
+		log.Panicf("Cannot get existing commands: %v", err)
+	}
+
+	// 現在のコードで使用しているコマンド名をセットにする
+	currentCommands := make(map[string]bool)
+
+	for _, cmd := range command.Commands {
+		currentCommands[cmd.Name] = true
+	}
+
+	// 不要になったコマンドを削除
+	for _, cmd := range existingCommands {
+		if !currentCommands[cmd.Name] {
+			log.Printf("Deleting old command: %s", cmd.Name)
+
+			err := dg.ApplicationCommandDelete(
+				dg.State.User.ID,
+				"",
+				cmd.ID,
+			)
+			if err != nil {
+				log.Printf("Cannot delete command '%s': %v", cmd.Name, err)
+			}
+		}
+	}
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(command.Commands))
 	for i, v := range command.Commands {
 		cmd, err := dg.ApplicationCommandCreate(dg.State.User.ID, "", v)

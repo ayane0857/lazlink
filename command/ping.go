@@ -7,20 +7,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// Commands はDiscordに登録するスラッシュコマンド一覧
-var Commands = []*discordgo.ApplicationCommand{
-	{
-		Name:        "ping",
-		Description: "Pingコマンド",
-	},
-}
-
-// Handlers はコマンド名と処理を対応させる
-var Handlers = map[string]func(
-	s *discordgo.Session,
-	i *discordgo.InteractionCreate,
-){
-	"ping": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func init() {
+	Handlers["ping"] = func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		latency := s.HeartbeatLatency()
 		embed := &discordgo.MessageEmbed{
 			Title:       "Ping Command",
@@ -39,5 +27,5 @@ var Handlers = map[string]func(
 		if err != nil {
 			// 必要ならログ処理
 		}
-	},
+	}
 }
