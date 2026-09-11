@@ -1,31 +1,41 @@
 package command
 
 import (
-	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/events"
 )
 
 func init() {
-	Handlers["help"] = func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		latency := s.HeartbeatLatency()
-		embed := &discordgo.MessageEmbed{
+	Handlers["help"] = func(event *events.ApplicationCommandInteractionCreate) {
+		now := time.Now()
+		embed := discord.Embed{
 			Title:       "Help Command",
-			Description: fmt.Sprintf("This is a help command response. Latency: %v", latency),
+			Description: "This is a help command response.",
 			Color:       0x5865F2,
-			Timestamp:   time.Now().Format(time.RFC3339),
+			Timestamp:   &now,
 		}
 
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Embeds: []*discordgo.MessageEmbed{embed},
+		components := discord.ActionRowComponent{
+			Components: []discord.InteractiveComponent{
+				discord.NewLinkButton("Documentation", "https://discord.com/developers/docs/interactions/message-components#buttons").
+					WithEmoji(discord.ComponentEmoji{Name: "📜"}),
+				discord.NewLinkButton("Discord developers", "https://discord.gg/discord-developers").
+					WithEmoji(discord.ComponentEmoji{Name: "🔧"}),
+				discord.NewLinkButton("Discord Gophers", "https://discord.gg/7RuRrVHyXF").
+					WithEmoji(discord.ComponentEmoji{Name: "🦫"}),
 			},
-		})
+		}
 
-		if err != nil {
-			// 必要ならログ処理
+		if err := event.CreateMessage(
+			discord.NewMessageCreate().
+				WithEmbeds(embed).
+				WithComponents(components).
+				WithEphemeral(true),
+		); err != nil {
+			slog.Error("failed to send help response", slog.Any("err", err))
 		}
 	}
 }

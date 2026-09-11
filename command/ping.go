@@ -2,30 +2,31 @@ package command
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/events"
 )
 
 func init() {
-	Handlers["ping"] = func(s *discordgo.Session, i *discordgo.InteractionCreate) {
-		latency := s.HeartbeatLatency()
-		embed := &discordgo.MessageEmbed{
+	Handlers["ping"] = func(event *events.ApplicationCommandInteractionCreate) {
+		latency := event.Client().Gateway.Latency()
+
+		now := time.Now()
+		embed := discord.Embed{
 			Title:       "Ping Command",
 			Description: fmt.Sprintf("This is a ping command response. Latency: %v", latency),
 			Color:       0x5865F2,
-			Timestamp:   time.Now().Format(time.RFC3339),
+			Timestamp:   &now,
 		}
 
-		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Embeds: []*discordgo.MessageEmbed{embed},
-			},
-		})
-
-		if err != nil {
-			// 必要ならログ処理
+		if err := event.CreateMessage(
+			discord.NewMessageCreate().
+				WithEmbeds(embed).
+				WithEphemeral(true),
+		); err != nil {
+			slog.Error("failed to send ping response", slog.Any("err", err))
 		}
 	}
 }

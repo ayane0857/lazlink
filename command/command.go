@@ -1,19 +1,14 @@
 package command
 
-import "github.com/bwmarrin/discordgo"
+import "github.com/disgoorg/disgo/discord"
 
-var Commands = []*discordgo.ApplicationCommand{
-	{
+var Commands = []discord.ApplicationCommandCreate{
+	discord.SlashCommandCreate{
 		Name:        "ping",
 		Description: "Pingコマンド",
 	},
-	{
+	discord.SlashCommandCreate{
 		Name:        "help",
 		Description: "ヘルプコマンド",
 	},
 }
-
-var Handlers = map[string]func(
-	s *discordgo.Session,
-	i *discordgo.InteractionCreate,
-){}
