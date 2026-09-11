@@ -9,30 +9,44 @@ import (
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
-	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/joho/godotenv"
+
+	"lazlink/command"
 )
 
+var token string
+
 func main() {
-	slog.Info("starting example...")
-	slog.Info("disgo version", slog.String("version", disgo.Version))
-	slog.Info("load the .env file")
+	slog.Info("starting bot...")
+
+	// .envを読み込む
 	err := godotenv.Load(".env")
 	if err != nil {
 		slog.Error("error loading .env file", slog.Any("err", err))
 		return
 	}
-	client, err := disgo.New(os.Getenv("DISCORD_TOKEN"),
+
+	token = os.Getenv("DISCORD_TOKEN")
+
+	if token == "" {
+		slog.Error("DISCORD_TOKEN is not set")
+		return
+	}
+
+	// Botを作成
+	client, err := disgo.New(
+		token,
 		bot.WithGatewayConfigOpts(
 			gateway.WithIntents(
 				gateway.IntentGuildMessages,
 				gateway.IntentMessageContent,
 			),
 		),
-		bot.WithEventListenerFunc(onMessageCreate),
+		bot.WithEventListenerFunc(commandListener),
 	)
+
 	if err != nil {
 		slog.Error("error while building disgo", slog.Any("err", err))
 		return
@@ -40,28 +54,50 @@ func main() {
 
 	defer client.Close(context.TODO())
 
-	if err = client.OpenGateway(context.TODO()); err != nil {
-		slog.Error("errors while connecting to gateway", slog.Any("err", err))
+	// /pingなどのコマンドをDiscordに登録
+	_, err = client.Rest.SetGlobalCommands(
+		client.ApplicationID,
+		command.Commands,
+	)
+
+	if err != nil {
+		slog.Error(
+			"error while registering commands",
+			slog.Any("err", err),
+		)
 		return
 	}
 
-	slog.Info("example is now running. Press CTRL-C to exit.")
+	slog.Info("commands registered")
+
+	// Discord Gatewayに接続
+	if err = client.OpenGateway(context.TODO()); err != nil {
+		slog.Error(
+			"errors while connecting to gateway",
+			slog.Any("err", err),
+		)
+		return
+	}
+
+	slog.Info("bot is now running. Press CTRL-C to exit.")
+
+	// Ctrl+Cで終了
 	s := make(chan os.Signal, 1)
-	signal.Notify(s, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	signal.Notify(
+		s,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		os.Interrupt,
+	)
+
 	<-s
 }
 
-func onMessageCreate(event *events.MessageCreate) {
-	if event.Message.Author.Bot {
-		return
-	}
-	var message string
-	if event.Message.Content == "ping" {
-		message = "pong"
-	} else if event.Message.Content == "pong" {
-		message = "ping"
-	}
-	if message != "" {
-		_, _ = event.Client().Rest.CreateMessage(event.ChannelID, discord.NewMessageCreate().WithContent(message))
+func commandListener(event *events.ApplicationCommandInteractionCreate) {
+	data := event.SlashCommandInteractionData()
+
+	switch data.CommandName() {
+	case "ping":
+		command.Ping(event)
 	}
 }
